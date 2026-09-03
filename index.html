@@ -1,0 +1,1357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="style.css">
+<title>WeatherX - Premium Weather App</title>
+ <link
+rel="stylesheet"
+href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+/>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+<div class="weather-effects" id="weatherEffects"></div>
+<div class="bg-circle c1"></div>
+<div class="bg-circle c2"></div>
+
+<div class="container">
+
+<header>
+    <div class="logo">🌤️ Weather<span>X</span></div>
+
+    <div class="header-actions">
+        <button class="icon-btn" onclick="toggleTheme()" id="themeBtn">🌙</button>
+    </div>
+</header>
+
+<div class="search-box">
+
+    <input
+        id="cityInput"
+        type="text"
+        placeholder="Search any city..."
+        value="Saharanpur"
+    >
+
+    <button class="search-btn" onclick="searchWeather()">
+        🔍 Search
+    </button>
+
+    <button class="location-btn" onclick="getLocation()">
+        📍 My Location
+    </button>
+
+</div>
+
+<div class="error" id="error"></div>
+
+<div class="loading" id="loading">
+    <div class="spinner"></div>
+    Getting weather data...
+</div>
+
+<div id="app">
+
+    <!-- CURRENT WEATHER -->
+
+    <div class="card main-weather">
+
+        <div class="place" id="place">--</div>
+        <div class="date" id="date">--</div>
+
+        <div class="weather-main">
+
+            <div class="weather-icon" id="icon">☀️</div>
+
+            <div class="temperature" id="temp">
+                --°C
+            </div>
+
+        </div>
+
+        <div class="condition" id="condition">
+            --
+        </div>
+
+        <div class="feels" id="feels">
+            Feels like --°C
+        </div>
+
+        <div class="stats">
+
+            <div class="stat">
+                <div class="stat-icon">💧</div>
+                <div class="stat-title">Humidity</div>
+                <div class="stat-value" id="humidity">--</div>
+            </div>
+
+            <div class="stat">
+                <div class="stat-icon">💨</div>
+                <div class="stat-title">Wind Speed</div>
+                <div class="stat-value" id="wind">--</div>
+            </div>
+
+            <div class="stat">
+                <div class="stat-icon">🔵</div>
+                <div class="stat-title">Pressure</div>
+                <div class="stat-value" id="pressure">--</div>
+            </div>
+
+            <div class="stat">
+                <div class="stat-icon">👁️</div>
+                <div class="stat-title">Visibility</div>
+                <div class="stat-value" id="visibility">--</div>
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- HOURLY -->
+
+    <div class="card section" style="margin-top:18px">
+
+        <div class="section-title">
+            <span>🕐 Hourly Forecast</span>
+            <span>Next 12 hours</span>
+        </div>
+
+        <div class="hourly" id="hourly"></div>
+
+    </div>
+
+
+    <!-- 5 DAY -->
+
+    <div class="card section" style="margin-top:18px">
+
+        <div class="section-title">
+            <span>📅 Forecast</span>
+            <span>5 Days</span>
+        </div>
+
+        <div class="forecast" id="forecast"></div>
+
+    </div>
+
+
+    <!-- SUNRISE -->
+
+    <div class="card section" style="margin-top:18px">
+
+        <div class="section-title">
+            <span>🌅 Sun</span>
+        </div>
+
+        <div class="sun">
+
+            <div class="sun-card">
+                <div class="sun-icon">🌅</div>
+                <div class="sun-title">Sunrise</div>
+                <div class="sun-time" id="sunrise">--</div>
+            </div>
+
+            <div class="sun-card">
+                <div class="sun-icon">🌇</div>
+                <div class="sun-title">Sunset</div>
+                <div class="sun-time" id="sunset">--</div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+<footer>
+    WeatherX • Live weather information
+</footer>
+
+</div>
+
+
+<script>
+/* =====================================================
+   WEATHERX - COMPLETE SCRIPT
+===================================================== */
+
+/* ================= API KEY ================= */
+
+const API_KEY = "ce322b5cad35caecd392711d80d1116a";
+
+
+/* ================= WEATHER EMOJI ================= */
+
+function emoji(weather) {
+
+    const w = String(weather).toLowerCase();
+
+    if (w.includes("thunder")) return "⛈️";
+    if (w.includes("drizzle")) return "🌦️";
+    if (w.includes("rain")) return "🌧️";
+    if (w.includes("snow")) return "❄️";
+    if (w.includes("mist")) return "🌫️";
+    if (w.includes("fog")) return "🌫️";
+    if (w.includes("haze")) return "🌫️";
+    if (w.includes("dust")) return "🌪️";
+    if (w.includes("cloud")) return "☁️";
+
+    return "☀️";
+}
+
+
+/* ================= TIME ================= */
+
+function time(timestamp) {
+
+    return new Date(timestamp * 1000)
+        .toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit"
+        });
+}
+
+
+/* ================= ERROR ================= */
+
+function showError(message) {
+
+    const box = document.getElementById("error");
+
+    if (box) {
+        box.innerText = message;
+        box.style.display = "block";
+    }
+
+    const loading = document.getElementById("loading");
+
+    if (loading) {
+        loading.style.display = "none";
+    }
+}
+
+
+function hideError() {
+
+    const box = document.getElementById("error");
+
+    if (box) {
+        box.style.display = "none";
+    }
+}
+
+
+/* ================= SEARCH ================= */
+
+function searchWeather() {
+
+    const input = document.getElementById("cityInput");
+
+    if (!input) return;
+
+    const city = input.value.trim();
+
+    if (!city) {
+
+        showError("Please enter a city name.");
+
+        return;
+    }
+
+    loadWeather(city);
+}
+
+
+/* ================= LOAD WEATHER ================= */
+
+async function loadWeather(city) {
+
+    hideError();
+
+    const loading = document.getElementById("loading");
+
+    if (loading) {
+        loading.style.display = "block";
+    }
+
+    try {
+
+        const currentURL =
+            `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)}&appid=${API_KEY}&units=metric`;
+
+        const forecastURL =
+            `https://api.openweathermap.org/data/2.5/forecast?q=${encodeURIComponent(city)}&appid=${API_KEY}&units=metric`;
+
+        const [currentRes, forecastRes] =
+            await Promise.all([
+                fetch(currentURL),
+                fetch(forecastURL)
+            ]);
+
+
+        if (!currentRes.ok) {
+
+            if (currentRes.status === 401) {
+                throw new Error("Invalid API key.");
+            }
+
+            if (currentRes.status === 404) {
+                throw new Error("City not found.");
+            }
+
+            throw new Error("Unable to get weather data.");
+        }
+
+
+        if (!forecastRes.ok) {
+            throw new Error("Unable to get forecast data.");
+        }
+
+
+        const current = await currentRes.json();
+
+        const forecast = await forecastRes.json();
+
+
+        displayCurrent(current);
+
+        displayHourly(forecast);
+
+        displayForecast(forecast);
+
+        displayTemperatureGraph(forecast);
+
+        if (loading) {
+            loading.style.display = "none";
+        }
+
+    }
+    catch (error) {
+
+        console.error("Weather Error:", error);
+
+        showError(error.message || "Something went wrong.");
+
+    }
+}
+
+
+/* =====================================================
+   CURRENT WEATHER
+===================================================== */
+
+function displayCurrent(data) {
+
+    const place = document.getElementById("place");
+
+    if (place) {
+        place.innerText =
+            `${data.name}, ${data.sys.country}`;
+    }
+
+
+    const date = document.getElementById("date");
+
+    if (date) {
+
+        date.innerText =
+            new Date().toLocaleString([], {
+                weekday: "long",
+                day: "numeric",
+                month: "long",
+                year: "numeric"
+            });
+    }
+
+
+    const icon = document.getElementById("icon");
+
+    if (icon) {
+        icon.innerText =
+            emoji(data.weather[0].main);
+    }
+
+
+    const temp = document.getElementById("temp");
+
+    if (temp) {
+
+        temp.innerText =
+            `${Math.round(data.main.temp)}°C`;
+    }
+
+
+    const condition =
+        document.getElementById("condition");
+
+    if (condition) {
+
+        condition.innerText =
+            data.weather[0].description;
+    }
+
+
+    const feels =
+        document.getElementById("feels");
+
+    if (feels) {
+
+        feels.innerText =
+            `Feels like ${Math.round(data.main.feels_like)}°C`;
+    }
+
+
+    const humidity =
+        document.getElementById("humidity");
+
+    if (humidity) {
+
+        humidity.innerText =
+            `${data.main.humidity}%`;
+    }
+
+
+    const wind =
+        document.getElementById("wind");
+
+    if (wind) {
+
+        wind.innerText =
+            `${data.wind.speed} m/s`;
+    }
+
+
+    const pressure =
+        document.getElementById("pressure");
+
+    if (pressure) {
+
+        pressure.innerText =
+            `${data.main.pressure} hPa`;
+    }
+
+
+    const visibility =
+        document.getElementById("visibility");
+
+    if (visibility) {
+
+        visibility.innerText =
+            `${(data.visibility / 1000).toFixed(1)} km`;
+    }
+
+
+    const sunrise =
+        document.getElementById("sunrise");
+
+    if (sunrise) {
+
+        sunrise.innerText =
+            time(data.sys.sunrise);
+    }
+
+
+    const sunset =
+        document.getElementById("sunset");
+
+    if (sunset) {
+
+        sunset.innerText =
+            time(data.sys.sunset);
+    }
+
+
+    /* ================= ADVANCED FEATURES ================= */
+
+    createWeatherEffects(
+        data.weather[0].main
+    );
+
+
+    createWind();
+
+
+    getAQI(
+        data.coord.lat,
+        data.coord.lon
+    );
+
+
+    getUV(
+        data.coord.lat,
+        data.coord.lon
+    );
+
+
+    createMap(
+        data.coord.lat,
+        data.coord.lon
+    );
+}
+
+
+/* =====================================================
+   HOURLY FORECAST
+===================================================== */
+
+function displayHourly(data) {
+
+    const box =
+        document.getElementById("hourly");
+
+    if (!box) return;
+
+    box.innerHTML = "";
+
+
+    data.list
+        .slice(0, 12)
+        .forEach(item => {
+
+            const d =
+                new Date(item.dt * 1000);
+
+
+            const rain =
+                Math.round(
+                    (item.pop || 0) * 100
+                );
+
+
+            const div =
+                document.createElement("div");
+
+
+            div.className = "hour";
+
+
+            div.innerHTML = `
+
+                <div class="hour-time">
+                    ${d.toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit"
+                    })}
+                </div>
+
+                <div class="hour-icon">
+                    ${emoji(item.weather[0].main)}
+                </div>
+
+                <div class="hour-temp">
+                    ${Math.round(item.main.temp)}°C
+                </div>
+
+                <div class="hour-rain">
+                    💧 ${rain}%
+                </div>
+
+            `;
+
+
+            box.appendChild(div);
+
+        });
+}
+
+
+/* =====================================================
+   5 DAY FORECAST
+===================================================== */
+
+function displayForecast(data) {
+
+    const box =
+        document.getElementById("forecast");
+
+    if (!box) return;
+
+    box.innerHTML = "";
+
+
+    const days = {};
+
+
+    data.list.forEach(item => {
+
+        const date =
+            new Date(item.dt * 1000);
+
+
+        const key =
+            date.toLocaleDateString();
+
+
+        if (!days[key]) {
+
+            days[key] = item;
+
+        }
+
+    });
+
+
+    Object.values(days)
+        .slice(0, 5)
+        .forEach(item => {
+
+            const d =
+                new Date(item.dt * 1000);
+
+
+            const div =
+                document.createElement("div");
+
+
+            div.className = "day";
+
+
+            div.innerHTML = `
+
+                <div class="day-name">
+                    ${d.toLocaleDateString([], {
+                        weekday: "short"
+                    })}
+                </div>
+
+                <div class="day-icon">
+                    ${emoji(item.weather[0].main)}
+                </div>
+
+                <div class="day-temp">
+                    ${Math.round(item.main.temp)}°C
+                </div>
+
+                <div class="day-desc">
+                    ${item.weather[0].main}
+                </div>
+
+            `;
+
+
+            box.appendChild(div);
+
+        });
+}
+let temperatureChart = null;
+
+function displayTemperatureGraph(data) {
+
+    const canvas = document.getElementById("temperatureChart");
+
+    if (!canvas) return;
+
+    const labels = data.list
+        .slice(0, 8)
+        .map(item => {
+            const d = new Date(item.dt * 1000);
+
+            return d.toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit"
+            });
+        });
+
+    const temperatures = data.list
+        .slice(0, 8)
+        .map(item => Math.round(item.main.temp));
+
+    if (temperatureChart) {
+        temperatureChart.destroy();
+    }
+
+    temperatureChart = new Chart(canvas, {
+
+        type: "line",
+
+        data: {
+            labels: labels,
+
+            datasets: [{
+                label: "Temperature °C",
+
+                data: temperatures,
+
+                tension: 0.4,
+
+                fill: true,
+
+                borderWidth: 3,
+
+                pointRadius: 5,
+
+                pointHoverRadius: 8
+            }]
+        },
+
+        options: {
+
+            responsive: true,
+
+            maintainAspectRatio: false,
+
+            interaction: {
+                intersect: false,
+                mode: "index"
+            },
+
+            plugins: {
+
+                legend: {
+                    display: true
+                }
+
+            },
+
+            scales: {
+
+                y: {
+                    beginAtZero: false,
+
+                    title: {
+                        display: true,
+                        text: "Temperature (°C)"
+                    }
+                },
+
+                x: {
+                    title: {
+                        display: true,
+                        text: "Time"
+                    }
+                }
+
+            }
+        }
+
+    });
+} 
+
+
+/* =====================================================
+   CURRENT LOCATION
+===================================================== */
+
+function getLocation() {
+
+    if (!navigator.geolocation) {
+
+        showError(
+            "Geolocation is not supported."
+        );
+
+        return;
+    }
+
+
+    navigator.geolocation.getCurrentPosition(
+
+        async position => {
+
+            const lat =
+                position.coords.latitude;
+
+            const lon =
+                position.coords.longitude;
+
+
+            try {
+
+                const url =
+                    `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=metric`;
+
+
+                const response =
+                    await fetch(url);
+
+
+                if (!response.ok) {
+
+                    throw new Error(
+                        "Unable to find your location."
+                    );
+                }
+
+
+                const data =
+                    await response.json();
+
+
+                const input =
+                    document.getElementById("cityInput");
+
+
+                if (input) {
+
+                    input.value =
+                        data.name;
+                }
+
+
+                loadWeather(
+                    data.name
+                );
+
+            }
+            catch (error) {
+
+                showError(
+                    error.message
+                );
+
+            }
+
+        },
+
+
+        () => {
+
+            showError(
+                "Location permission allow karo."
+            );
+
+        }
+
+    );
+}
+
+
+/* =====================================================
+   THEME
+===================================================== */
+
+function toggleTheme() {
+
+    document.body.classList.toggle("light");
+
+
+    const isLight =
+        document.body.classList.contains("light");
+
+
+    const button =
+        document.getElementById("themeBtn");
+
+
+    if (button) {
+
+        button.innerText =
+            isLight ? "☀️" : "🌙";
+    }
+
+
+    localStorage.setItem(
+        "weatherTheme",
+        isLight ? "light" : "dark"
+    );
+}
+
+
+/* =====================================================
+   WEATHER ANIMATIONS
+===================================================== */
+
+function createWeatherEffects(type) {
+
+    const container =
+        document.getElementById("weatherEffects");
+
+
+    if (!container) return;
+
+
+    container.innerHTML = "";
+
+
+    document.body.classList.remove(
+        "weather-rain",
+        "weather-cloud",
+        "weather-clear",
+        "weather-night"
+    );
+
+
+    const weather =
+        String(type).toLowerCase();
+
+
+    /* ================= RAIN ================= */
+
+    if (
+        weather.includes("rain") ||
+        weather.includes("drizzle") ||
+        weather.includes("thunder")
+    ) {
+
+        document.body.classList.add(
+            "weather-rain"
+        );
+
+
+        for (let i = 0; i < 100; i++) {
+
+            const drop =
+                document.createElement("div");
+
+
+            drop.className =
+                "rain-drop";
+
+
+            drop.style.left =
+                Math.random() * 100 + "%";
+
+
+            drop.style.animationDelay =
+                Math.random() + "s";
+
+
+            drop.style.animationDuration =
+                (0.4 + Math.random() * 0.5) + "s";
+
+
+            container.appendChild(drop);
+        }
+
+
+        return;
+    }
+
+
+    /* ================= CLOUD ================= */
+
+    if (weather.includes("cloud")) {
+
+        document.body.classList.add(
+            "weather-cloud"
+        );
+
+
+        for (let i = 0; i < 2; i++) {
+
+            const cloud =
+                document.createElement("div");
+
+
+            cloud.className =
+                "cloud cloud" + (i + 1);
+
+
+            container.appendChild(cloud);
+        }
+
+
+        return;
+    }
+
+
+    /* ================= NIGHT ================= */
+
+    const hour =
+        new Date().getHours();
+
+
+    if (hour >= 19 || hour < 6) {
+
+        document.body.classList.add(
+            "weather-night"
+        );
+
+
+        for (let i = 0; i < 70; i++) {
+
+            const star =
+                document.createElement("div");
+
+
+            star.className =
+                "star";
+
+
+            star.style.left =
+                Math.random() * 100 + "%";
+
+
+            star.style.top =
+                Math.random() * 70 + "%";
+
+
+            star.style.animationDelay =
+                Math.random() * 2 + "s";
+
+
+            container.appendChild(star);
+        }
+
+
+        return;
+    }
+
+
+    /* ================= SUNNY ================= */
+
+    document.body.classList.add(
+        "weather-clear"
+    );
+
+
+    const sun =
+        document.createElement("div");
+
+
+    sun.className =
+        "sun-effect";
+
+
+    container.appendChild(sun);
+}
+
+
+/* =====================================================
+   WIND ANIMATION
+===================================================== */
+
+function createWind() {
+
+    const container =
+        document.getElementById("weatherEffects");
+
+
+    if (!container) return;
+
+
+    for (let i = 0; i < 7; i++) {
+
+        const line =
+            document.createElement("div");
+
+
+        line.className =
+            "wind-line";
+
+
+        line.style.top =
+            (20 + Math.random() * 70) + "%";
+
+
+        line.style.animationDelay =
+            Math.random() * 3 + "s";
+
+
+        line.style.width =
+            (50 + Math.random() * 100) + "px";
+
+
+        container.appendChild(line);
+    }
+}
+
+
+/* =====================================================
+   AIR QUALITY
+===================================================== */
+
+async function getAQI(lat, lon) {
+
+    const value =
+        document.getElementById("aqiValue");
+
+    const status =
+        document.getElementById("aqiStatus");
+
+    const progress =
+        document.getElementById("aqiProgress");
+
+
+    if (!value) return;
+
+
+    try {
+
+        const url =
+            `https://api.openweathermap.org/data/2.5/air_pollution?lat=${lat}&lon=${lon}&appid=${API_KEY}`;
+
+
+        const response =
+            await fetch(url);
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                "AQI unavailable"
+            );
+        }
+
+
+        const data =
+            await response.json();
+
+
+        const aqi =
+            data.list[0].main.aqi;
+
+
+        const names = [
+            "",
+            "Good",
+            "Fair",
+            "Moderate",
+            "Poor",
+            "Very Poor"
+        ];
+
+
+        value.innerText =
+            aqi;
+
+
+        if (status) {
+
+            status.innerText =
+                names[aqi];
+        }
+
+
+        if (progress) {
+
+            progress.style.width =
+                (aqi / 5 * 100) + "%";
+        }
+
+    }
+    catch (error) {
+
+        console.error(
+            "AQI Error:",
+            error
+        );
+
+
+        value.innerText =
+            "--";
+
+
+        if (status) {
+
+            status.innerText =
+                "Unavailable";
+        }
+    }
+}
+
+
+/* =====================================================
+   UV INDEX
+===================================================== */
+
+async function getUV(lat, lon) {
+
+    const value = document.getElementById("uvValue");
+    const status = document.getElementById("uvStatus");
+
+    if (!value) return;
+
+    try {
+
+        const url =
+            `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=uv_index&forecast_days=1&timezone=auto`;
+
+        const response = await fetch(url);
+
+        if (!response.ok) {
+            throw new Error("UV data unavailable");
+        }
+
+        const data = await response.json();
+
+        const now = new Date();
+
+        let closestIndex = 0;
+        let smallestDifference = Infinity;
+
+        data.hourly.time.forEach((time, index) => {
+
+            const difference =
+                Math.abs(new Date(time) - now);
+
+            if (difference < smallestDifference) {
+                smallestDifference = difference;
+                closestIndex = index;
+            }
+        });
+
+        const uv =
+            data.hourly.uv_index[closestIndex];
+
+        value.innerText =
+            Number(uv).toFixed(1);
+
+        let text = "Low";
+
+        if (uv >= 3) text = "Moderate";
+        if (uv >= 6) text = "High";
+        if (uv >= 8) text = "Very High";
+        if (uv >= 11) text = "Extreme";
+
+        if (status) {
+            status.innerText = text;
+        }
+
+    } catch (error) {
+
+        console.error("UV Error:", error);
+
+        value.innerText = "--";
+
+        if (status) {
+            status.innerText = "Unavailable";
+        }
+    }
+} 
+
+
+
+/* =====================================================
+   WEATHER MAP
+===================================================== */
+
+let weatherMap = null;
+
+
+function createMap(lat, lon) {
+
+
+    const mapElement = document.getElementById("weatherMap");
+
+    if (!mapElement) return;
+
+    if (typeof L === "undefined") {
+        console.error("Leaflet library missing");
+        return;
+    }
+
+    if (weatherMap) {
+        weatherMap.remove();
+    }
+
+    weatherMap = L.map("weatherMap").setView(
+        [lat, lon],
+        8
+    );
+
+    // Normal map
+    L.tileLayer(
+        "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        {
+            maxZoom: 19,
+            attribution: "© OpenStreetMap"
+        }
+    ).addTo(weatherMap);
+
+
+    // 🌧️ Rain / Precipitation
+    L.tileLayer(
+        `https://tile.openweathermap.org/map/precipitation_new/{z}/{x}/{y}.png?appid=${API_KEY}`,
+        {
+            opacity: 0.65
+        }
+    ).addTo(weatherMap);
+
+
+    // ☁️ Clouds
+    L.tileLayer(
+        `https://tile.openweathermap.org/map/clouds_new/{z}/{x}/{y}.png?appid=${API_KEY}`,
+        {
+            opacity: 0.35
+        }
+    ).addTo(weatherMap);
+
+
+    // 📍 Current location
+    L.marker([lat, lon])
+        .addTo(weatherMap)
+        .bindPopup("📍 Current Location")
+        .openPopup();
+} 
+
+
+/* =====================================================
+   START APP
+===================================================== */
+
+loadWeather("Saharanpur"); 
+
+ 
+</script>
+
+
+<div class="card section aqi-card">
+
+    <div class="section-title">
+        <span>🌿 Air Quality</span>
+        <span id="aqiStatus">--</span>
+    </div>
+
+    <div class="aqi-value">
+        AQI <span id="aqiValue">--</span>
+    </div>
+
+    <div class="aqi-bar">
+        <div class="aqi-progress" id="aqiProgress"></div>
+    </div>
+
+</div>
+
+
+<!-- UV INDEX -->
+
+<div class="card section uv-card">
+
+    <div class="section-title">
+        <span>☀️ UV Index</span>
+    </div>
+
+    <div class="uv-value">
+        <span id="uvValue">--</span>
+    </div>
+
+    <div id="uvStatus">
+        UV Index
+    </div>
+
+</div>
+
+
+<!-- WEATHER MAP -->
+
+<div class="card section map-card">
+
+    <div class="section-title">
+        <span>🗺️ Weather Map</span>
+    </div>
+
+    <div id="weatherMap"></div>
+<!-- TEMPERATURE GRAPH -->
+<div class="card section temperature-card">
+
+    <div class="section-title">
+        <span>🌡️ Temperature Forecast</span>
+        <span id="graphLocation">24 Hours</span>
+    </div>
+
+    <div class="temperature-graph">
+        <canvas id="temperatureChart"></canvas>
+    </div>
+
+</div>
+</div> 
+<script
+src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
+</script>
+</body>
+</html> 
